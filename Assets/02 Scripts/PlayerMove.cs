@@ -10,6 +10,20 @@ public class PlayerMove : MonoBehaviour
 
     [Header("PlayerObject")]
     public Rigidbody rb;
+
+    [Header("Player Jump & Slide")]
+
+    [SerializeField] private float jumpForce = 6f;
+    [SerializeField] private float slideJumpUpForce = 5f;
+    [SerializeField] private float slideJumpForwardForce = 4f;
+    [SerializeField] private float groundCheckDistance = 1.2f;
+    [SerializeField] private float slopeLimit = 35f;
+    [SerializeField] private LayerMask groundMask = ~0;
+    
+    [Header("Player Rotate")]
+
+    [SerializeField] private float mouseSensitivity = 0.15f;
+    private float yaw;
     
 
     private Vector3 inputMove;
@@ -18,21 +32,25 @@ public class PlayerMove : MonoBehaviour
 
     public bool PlayerMoveLock = false;
     public bool PlayerRotateLock = false;
-
     private Quaternion lockRotation;
 
-    private bool isJump;
-
+    
+    private bool jumpRequest;
     private bool isGrounded;
+    private bool isSliding;
+    private bool isSlidingSurface;
 
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        yaw = transform.eulerAngles.y;
+
     }
 
     void Start()
     {
+        Cursor.lockState = CursorLockMode.Locked;
     }
 
     void Update()
@@ -46,10 +64,15 @@ public class PlayerMove : MonoBehaviour
             inputMove = Vector3.zero;
         }
 
-        if(!PlayerRotateLock)
+        if (!PlayerRotateLock && Mouse.current != null)
         {
-
-            //플레이어 마우스 위치에 따른 회전 기능 구현
+            float mouseX = Mouse.current.delta.ReadValue().x;
+            yaw += mouseX * mouseSensitivity;
+        }
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+        {
+            jumpRequest  = true;
+ 
         }
         
 
@@ -57,6 +80,9 @@ public class PlayerMove : MonoBehaviour
     void FixedUpdate()
     {
         UpdateMove();
+        UpdateGround();
+        HandleJump();
+        UpdateRotate();
 
     }
     public void UpdateMove()
@@ -80,17 +106,62 @@ public class PlayerMove : MonoBehaviour
                 rb.MovePosition(nextPos);
             }
         }
-
-       public void SetRotateLock(bool isLock)
-    {
-        PlayerRotateLock = isLock;
-
-        if (isLock)
+    public void UpdateRotate()
         {
-            lockRotation = transform.rotation;
-            rb.angularVelocity = Vector3.zero;
+            if (!PlayerRotateLock)
+            {
+                Quaternion targetRot = Quaternion.Euler(0f, yaw, 0f);
+                rb.MoveRotation(targetRot);
+            }
         }
+    private void UpdateGround()
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(rb.position + Vector3.up * 0.1f, Vector3.down, out hit, groundCheckDistance, groundMask))
+            {
+                isGrounded = true;
+                isSlidingSurface = hit.collider.CompareTag("Slope");
+            }
+        else
+            {
+                isGrounded = false;
+                isSlidingSurface = false;
+            } 
     }
+    public void SetRotateLock(bool isLock)
+        {
+            PlayerRotateLock = isLock;
+            if (isLock)
+            {
+                lockRotation = transform.rotation;
+                rb.angularVelocity = Vector3.zero;
+            }
+        }
+
+    private void HandleJump()
+        {
+            if (!jumpRequest) return;
+            jumpRequest = false;
+
+            if (!isGrounded) return; // 이단 점프 방지
+
+            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+
+            if (isSliding) SlideJump();
+            else NormalJump();
+
+            isGrounded = false;
+        }
+
+    private void NormalJump()
+        {
+            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+        }
+
+    private void SlideJump()
+        {
+
+        }
     
     private void GetInput()
     {        
