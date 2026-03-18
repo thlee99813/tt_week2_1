@@ -1,6 +1,6 @@
-using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using DG.Tweening;
 public class PlayerMove : MonoBehaviour
 {
     [Header("Move")]
@@ -14,11 +14,18 @@ public class PlayerMove : MonoBehaviour
     [Header("Player Jump & Slide")]
 
     [SerializeField] private float jumpForce = 6f;
-    [SerializeField] private float slideJumpUpForce = 5f;
-    [SerializeField] private float slideJumpForwardForce = 4f;
+    [SerializeField] private float slideJumpUpForce = 7f;
+    [SerializeField] private float slideJumpForwardForce = 3f;
     [SerializeField] private float groundCheckDistance = 1.2f;
     [SerializeField] private float slopeLimit = 35f;
     [SerializeField] private LayerMask groundMask = ~0;
+
+    [SerializeField] private float slideForwardSpeed = 8f;
+    [SerializeField] private float slideStrafeSpeed = 3.5f;
+
+    private float spinX;
+    private Tween SpinTween;
+
     
     [Header("Player Rotate")]
 
@@ -39,6 +46,8 @@ public class PlayerMove : MonoBehaviour
     private bool isGrounded;
     private bool isSliding;
     private bool isSlidingSurface;
+
+
 
 
     void Awake()
@@ -78,9 +87,17 @@ public class PlayerMove : MonoBehaviour
 
     }
     void FixedUpdate()
-    {
-        UpdateMove();
+    {        
         UpdateGround();
+
+        if (isSliding)
+        {
+            Sliding();   // 자동 아래로 미끄러짐
+        }
+        else
+        {
+            UpdateMove();
+        }
         HandleJump();
         UpdateRotate();
 
@@ -107,26 +124,28 @@ public class PlayerMove : MonoBehaviour
             }
         }
     public void UpdateRotate()
+    {
+        if (!PlayerRotateLock)
         {
-            if (!PlayerRotateLock)
-            {
-                Quaternion targetRot = Quaternion.Euler(0f, yaw, 0f);
-                rb.MoveRotation(targetRot);
-            }
+            Quaternion targetRot = Quaternion.Euler(spinX, yaw, 0f);
+            rb.MoveRotation(targetRot);
         }
+    }    
     private void UpdateGround()
     {
         RaycastHit hit;
         if (Physics.Raycast(rb.position + Vector3.up * 0.1f, Vector3.down, out hit, groundCheckDistance, groundMask))
-            {
-                isGrounded = true;
-                isSlidingSurface = hit.collider.CompareTag("Slope");
-            }
+        {
+            isGrounded = true;
+            isSlidingSurface = hit.collider.CompareTag("Slope");
+        }
         else
-            {
-                isGrounded = false;
-                isSlidingSurface = false;
-            } 
+        {
+            isGrounded = false;
+            isSlidingSurface = false;
+        }
+
+        isSliding = isGrounded && isSlidingSurface;
     }
     public void SetRotateLock(bool isLock)
         {
@@ -145,31 +164,55 @@ public class PlayerMove : MonoBehaviour
 
             if (!isGrounded) return; // 이단 점프 방지
 
-            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+            rb.AddForce(Vector3.up * -rb.linearVelocity.y, ForceMode.VelocityChange);
 
-            if (isSliding) SlideJump();
-            else NormalJump();
-
+            if (isSliding) 
+            {
+                SlideJump();
+            }
+            else 
+            {
+                NormalJump();
+            }
             isGrounded = false;
         }
 
     private void NormalJump()
         {
+
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         }
-
-    private void SlideJump()
+    private void Sliding()
         {
+            Vector3 autoForward = transform.forward * slideForwardSpeed;
+            Vector3 sideMove = transform.right * inputMove.x * slideStrafeSpeed;
+            Vector3 move = (autoForward + sideMove) * Time.fixedDeltaTime;
+            rb.MovePosition(rb.position + move);
 
         }
+    private void SlideJump()
+    {
+        rb.AddForce(Vector3.up * slideJumpUpForce, ForceMode.Impulse);
+
+        SpinTween?.Kill();
+        spinX = 0f;
+        SpinTween = DOTween.Sequence()
+            .Append(DOTween.To(() => spinX, x => spinX = x, 1440f, 1.5f).SetEase(Ease.OutCubic));
+            //.Append(DOTween.To(() => spinX, x => spinX = x, 0f, 0.2f).SetEase(Ease.OutQuad));
+    }
     
     private void GetInput()
     {        
         Vector2 move = Vector2.zero;
-        if(Keyboard.current.aKey.isPressed) move.x -= 1f;
-        if(Keyboard.current.dKey.isPressed) move.x += 1f;
-        if(Keyboard.current.sKey.isPressed) move.y -= 1f;
-        if(Keyboard.current.wKey.isPressed) move.y += 1f;
+
+        if (Keyboard.current.aKey.isPressed) move.x -= 1f;
+        if (Keyboard.current.dKey.isPressed) move.x += 1f;
+
+        if (!isSliding)
+        {
+            if (Keyboard.current.sKey.isPressed) move.y -= 1f;
+            if (Keyboard.current.wKey.isPressed) move.y += 1f;
+        }
 
         move = move.normalized;
         inputMove = new Vector3(move.x, 0f, move.y);

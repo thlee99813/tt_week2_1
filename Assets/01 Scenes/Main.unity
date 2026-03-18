@@ -254,13 +254,15 @@ MonoBehaviour:
   movespeed: 6
   rb: {fileID: 0}
   jumpForce: 6
-  slideJumpUpForce: 5
+  slideJumpUpForce: 7
   slideJumpForwardForce: 4
   groundCheckDistance: 1.2
   slopeLimit: 35
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  slideForwardSpeed: 16
+  slideStrafeSpeed: 8
   mouseSensitivity: 0.15
   PlayerMoveLock: 0
   PlayerRotateLock: 0
@@ -382,7 +384,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: e47d67c36bc64224491bac6c187fcd62, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
